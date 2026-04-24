@@ -2,7 +2,6 @@
 
 __version__ = "0.1.0"
 
-from .main import run
 from .flow import StockAnalysisFlow, StockAnalysisState
 from .models import (
     AnalysisResult,
@@ -10,7 +9,6 @@ from .models import (
 )
 
 __all__ = [
-    "run",
     "StockAnalysisFlow",
     "StockAnalysisState",
     "AnalysisResult",
