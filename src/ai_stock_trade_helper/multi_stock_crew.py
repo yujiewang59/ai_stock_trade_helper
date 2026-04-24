@@ -41,7 +41,7 @@ class MultiStockCrew:
         return Agent(
             # config=self.agents_config["multi_stock_analyzer"],  # type: ignore[index]
             role="""股票投资分析专家""",
-            goal="""根据多支股票的投资决策结果，结合当前收益情况、历史操作信息，生成行业级别的综合投资策略""",
+            goal="""根据多支股票的投资决策结果，结合当前收益情况、风险偏好、行业特点，生成行业级别的综合投资策略""",
             backstory="""
                 你是一位顶级的行业投资分析师，拥有丰富的投资组合管理经验。
                 你能够从宏观到微观分析行业趋势，对比不同股票的相对优劣，
@@ -93,7 +93,7 @@ class MultiStockCrew:
                             "position_size": "建议仓位大小（0-1）"
                         }
                     ],
-                    "summary": "每支股票的操作决策原因、综合原因分析、风险评估",
+                    "summary": "总结每支股票的综合分析报告（数据支撑）、综合决策原因分析、风险评估",
                     "overall_recommendation": "综合性的行业投资建议"
                 }
                 """,
