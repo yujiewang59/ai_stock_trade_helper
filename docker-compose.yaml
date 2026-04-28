@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  # 后端核心服务：FastAPI + Celery + Redis（多进程，supervisor管理）
+  core-service:
+    build: .
+    restart: always
+    ports:
+      - "8000:8000"   # FastAPI
+      - "5555:5555"   # Flower 监控
+    volumes:
+      - .:/app
+    env_file: .env 
+    command: supervisord -c /etc/supervisor/conf.d/supervisord.conf
+
+  # Streamlit 前端服务：独立容器，单进程（Docker直接管理）
+  streamlit:
+    build: .
+    restart: always
+    ports:
+      - "8501:8501"   # Streamlit 前端
+    volumes:
+      - .:/app
+    depends_on:
+      - core-service
+    command: streamlit run stock_analysis_app.py --server.address=0.0.0.0 --server.port=8501

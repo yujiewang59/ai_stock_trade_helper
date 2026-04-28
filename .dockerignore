@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+.github
+
+# Environnement local & Secrets
+.venv
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Outils de dev & Tests
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+tests/
+
+# Documentation & Divers
+docs/
+*.md
+*.rst
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo

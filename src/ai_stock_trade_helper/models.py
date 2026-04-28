@@ -59,3 +59,10 @@ class StockAnalysisState(BaseModel):
     multi_stock_decision: Optional[MultiStockDecision] = Field(None, description="多股分析最终决策")
 
 
+class TaskRequest(BaseModel):
+    """任务请求参数"""
+    industry: str
+    industry_label: str
+    user_assets: float
+    user_stock_holds: list[UserStockHold]
+    risk_level: str

@@ -212,7 +212,7 @@ if st.session_state.task_id is not None and st.session_state.task_status == "pen
         status = task_result.get("status")
         if status == "completed":
             # 任务完成，保存结果
-            st.session_state.task_status = "completed"
+            st.session_state.task_status = status
             st.session_state.analysis_result = task_result.get("result")
             status_placeholder.empty()
             st.rerun()
@@ -231,7 +231,7 @@ if st.session_state.task_id is not None and st.session_state.task_status == "pen
         st.rerun()
 
 # ====================== 分析结果渲染 ======================
-if st.session_state.analysis_result is not None:
+if st.session_state.analysis_result is not None and type(st.session_state.analysis_result) == dict:
     st.markdown("---")
     st.subheader("📋 分析结果")
     

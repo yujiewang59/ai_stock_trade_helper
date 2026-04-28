@@ -183,6 +183,204 @@ crewai run
 
 ---
 
+## 🐳 Docker 部署
+
+项目提供完整的 Docker 化部署方案，支持一键启动所有服务（FastAPI 后端 + Streamlit 前端 + Celery 异步任务 + Redis 消息队列 + Flower 监控）。
+
+### 前置要求
+
+- [Docker](https://docs.docker.com/get-docker/) (>= 20.10)
+- [Docker Compose](https://docs.docker.com/compose/install/) (>= 1.29)
+- 有效的 DeepSeek API Key 和 Tushare Token
+
+### 快速启动
+
+#### 1. 配置环境变量
+
+```bash
+# 复制环境变量模板
+cp .env.example .env
+```
+
+编辑 `.env` 文件，填入你的 API 密钥：
+
+```ini
+DEEPSEEK_API_KEY="your_deepseek_api_key_here"
+DEEPSEEK_API_BASE="https://api.deepseek.com"
+TUSHARE_TOKEN="your_tushare_token_here"
+```
+
+#### 2. 构建并启动所有服务
+
+```bash
+# 一键构建并后台启动所有服务
+docker compose up -d --build
+```
+
+#### 3. 访问服务
+
+| 服务 | 地址 | 说明 |
+|------|------|------|
+| **Streamlit 前端** | http://localhost:8501 | 交互式股票分析界面 |
+| **FastAPI 后端** | http://localhost:8000 | REST API 接口 |
+| **FastAPI 文档** | http://localhost:8000/docs | Swagger API 文档 |
+| **Flower 监控** | http://localhost:5555 | Celery 任务队列监控 |
+
+#### 4. 查看日志
+
+```bash
+# 查看所有服务日志
+docker compose logs -f
+
+# 查看特定服务日志
+docker compose logs -f core-service
+docker compose logs -f streamlit
+
+# 实时追踪后端日志
+docker compose logs -f core-service | grep fastapi
+```
+
+#### 5. 停止服务
+
+```bash
+# 停止并移除容器
+docker compose down
+
+# 停止并同时删除数据卷（Redis 缓存等）
+docker compose down -v
+```
+
+### 服务架构说明
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                    Docker 宿主机                          │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│  ┌───────── docker-compose 网络 ──────────────┐          │
+│  │                                              │          │
+│  │  ┌──────────────────────────────────────┐   │          │
+│  │  │      core-service (单个容器)           │   │          │
+│  │  │  ┌────────────┐ ┌──────────────────┐ │   │          │
+│  │  │  │  Redis      │ │ FastAPI (8000)   │ │   │          │
+│  │  │  │  (6379)     │ └──────────────────┘ │   │          │
+│  │  │  ├────────────┤ ┌──────────────────┐ │   │          │
+│  │  │  │ Supervisor  │ │ Celery Worker    │ │   │          │
+│  │  │  │ (进程管理)   │ └──────────────────┘ │   │          │
+│  │  │  │            │ ┌──────────────────┐ │   │          │
+│  │  │  │            │ │ Flower (5555)    │ │   │          │
+│  │  │  └────────────┘ └──────────────────┘ │   │          │
+│  │  └──────────────────────────────────────┘   │          │
+│  │                                              │          │
+│  │  ┌──────────────────────────────────────┐   │          │
+│  │  │  streamlit (独立容器)                 │   │          │
+│  │  │  └─ Streamlit App (8501)            │   │          │
+│  │  └──────────────────────────────────────┘   │          │
+│  │                                              │          │
+│  └──────────────────────────────────────────────┘          │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
+```
+
+#### 容器说明
+
+| 容器名 | 基于镜像 | 进程管理 | 功能 |
+|--------|---------|---------|------|
+| `core-service` | `python:3.12-slim` | **Supervisor** 管理多进程 | 运行 Redis + FastAPI + Celery Worker + Flower |
+| `streamlit` | `python:3.12-slim` | **Docker** 直接管理（单进程） | 运行 Streamlit 前端 UI |
+
+`core-service` 容器内通过 Supervisor 同时管理 4 个进程（参见 `supervisord.conf`）：
+- `redis` — 消息队列服务
+- `fastapi` — FastAPI HTTP 后端
+- `celery_worker` — Celery 异步任务处理器
+- `flower` — Celery 任务监控面板
+
+### 构建优化建议
+
+#### 利用 Docker 层缓存加速构建
+
+```bash
+# 首次完整构建（较慢）
+docker compose build --no-cache
+
+# 增量构建（仅重新构建有变化的层）
+docker compose build
+```
+
+#### 国内镜像加速
+
+修改 `Dockerfile` 使用国内镜像源以加速构建：
+
+```dockerfile
+# 使用中科大镜像（加速 apt 安装）
+# FROM docker.mirrors.ustc.edu.cn/library/python:3.12-slim
+
+# 或者配置 pip 镜像
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
+```
+
+（`Dockerfile` 中已注释中科大镜像行，取消注释即可启用）
+
+#### 生产环境建议
+
+```bash
+# 1. 使用不含调试信息的精简构建
+docker compose build
+
+# 2. 移除源码挂载，改用镜像内代码（修改 compose 文件）
+# volumes: .:/app  →  移除或注释掉
+
+# 3. 限制日志文件大小（添加 logging 配置）
+# logging:
+#   driver: "json-file"
+#   options:
+#     max-size: "10m"
+#     max-file: "3"
+
+# 4. 设置重启策略（已在 compose 中配置 restart: always）
+
+# 5. 暴露最小端口集
+# 仅暴露 Streamlit 前端端口（8501），后端 API 仅内部访问
+```
+
+### 常见问题排查
+
+| 问题 | 原因 | 解决 |
+|------|------|------|
+| `ModuleNotFoundError` | 依赖未正确安装 | 重建镜像：`docker compose build --no-cache` |
+| `Connection refused` | 服务启动顺序问题 | 检查 `depends_on` 配置，或等待几秒后重试 |
+| Redis 连接失败 | Redis 未正确启动 | `docker compose logs core-service \| grep redis` 检查日志 |
+| API 密钥错误 | `.env` 未正确配置 | 检查环境变量：`docker compose run core-service env \| grep DEEPSEEK` |
+| 端口冲突 | 本地已有服务占用端口 | 修改 `docker-compose.yaml` 中宿主端口映射，如 `"8502:8501"` |
+| 权限错误 | 文件权限问题 | `chmod -R 755 .` 修复项目目录权限 |
+| Streamlit 无法连接后端 | 跨容器网络不通 | 确保 `backend.py` 中后端地址配置正确 |
+| 构建速度慢 | 网络或缓存问题 | 使用国内镜像源或 `--no-cache` 强制重新拉取基础镜像 |
+
+### 开发工作流
+
+```bash
+# 1. 编辑代码（由于 volumes 挂载，修改后自动生效）
+
+# 2. 重启受影响的容器（热更新不需要重启所有）
+docker compose restart streamlit   # 重启前端
+docker compose restart core-service # 重启后端（需要重新构建）
+
+# 3. 查看实时日志
+docker compose logs -f --tail=100
+
+# 4. 进入容器调试
+docker compose exec core-service /bin/bash
+docker compose exec streamlit /bin/bash
+
+# 5. 在容器内运行测试
+docker compose exec core-service python -c "from ai_stock_trade_helper.models import *; print('OK')"
+
+# 6. 清理不用的镜像和缓存
+docker system prune -f
+```
+
+---
+
 ## 🖥️ 界面截图与使用指南
 
 ### Streamlit 界面操作步骤
@@ -388,3 +586,5 @@ MIT
   url = {}  % TODO: https://github.com/yujiewang59/ai_stock_trade_helper
 }
 ```
+
+

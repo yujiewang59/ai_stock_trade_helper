@@ -3,13 +3,9 @@ from pathlib import Path
 
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
-from crewai.agents.agent_builder.base_agent import BaseAgent
-from typing import List
-import yaml
 from dotenv import load_dotenv
 import os
 
-from ai_stock_trade_helper.models import AnalysisResult
 from ai_stock_trade_helper.tools.stock_tools import GetMarketSentimentTool, GetStockBasicInfoTool, GetStockTechnicalIndicatorsTool
 
 from crewai.skills import discover_skills, activate_skill
@@ -28,7 +24,8 @@ llm = LLM(
     max_tokens=4096
 )
 
-skills = discover_skills(Path("skills"))
+skill_path = "src/ai_stock_trade_helper/skills"
+skills = discover_skills(Path(skill_path))
 
 base_skill = [activate_skill(s) for s in skills if s.name == "base-analysis"]
 senti_skill = [activate_skill(s) for s in skills if s.name == "sentiment-analysis"]

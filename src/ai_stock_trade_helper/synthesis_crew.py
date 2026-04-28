@@ -27,7 +27,8 @@ llm = LLM(
     max_tokens=4096
 )
 
-skills = discover_skills(Path("skills"))
+skill_path = "src/ai_stock_trade_helper/skills"
+skills = discover_skills(Path(skill_path))
 activated = [activate_skill(s) for s in skills if s.name == "synthesis-analysis"]
 
 
