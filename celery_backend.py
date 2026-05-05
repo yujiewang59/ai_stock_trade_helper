@@ -2,8 +2,12 @@ from celery import Celery
 from ai_stock_trade_helper.flow import StockAnalysisFlow
 from dotenv import load_dotenv
 import os
+from openinference.instrumentation.crewai import CrewAIInstrumentor
 
 from ai_stock_trade_helper.models import TaskRequest
+
+import openlit
+from langfuse import get_client, Langfuse
 
 load_dotenv()
 broker = os.getenv("REDIS_URL")
@@ -24,10 +28,26 @@ app.conf.update(
     task_max_retries=3
 )
 
+# 初始化追踪器
+# CrewAIInstrumentor().instrument(skip_dep_check=True)
+
 # ====================== 业务任务 ======================
 # 任务: 接收分析请求，执行CrewAI流程，返回结果
 @app.task(name="analysis_task")
 def analysis_task(request: dict):
+    langfuse = Langfuse(
+        public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+        secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+        host=os.getenv("LANGFUSE_HOST")
+    )
+ 
+    # Verify connection
+    if langfuse.auth_check():
+        print("Langfuse client is authenticated and ready!")
+    else:
+        print("Authentication failed. Please check your credentials and host.")
+    openlit.init()
+    
     try:
         data = TaskRequest(
             industry=request["industry"],
@@ -38,7 +58,7 @@ def analysis_task(request: dict):
         )
 
         """异步分析任务"""
-        flow = StockAnalysisFlow()
+        flow = StockAnalysisFlow(tracing=True)
         flow.state.industry = data.industry
         flow.state.industry_label = data.industry_label
         flow.state.user_assets = data.user_assets

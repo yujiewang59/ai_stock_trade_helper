@@ -13,19 +13,6 @@ from ai_stock_trade_helper.models import MultiStockDecision
 
 load_dotenv()
 
-# 初始化 DeepSeek 模型
-llm = LLM(
-    model="deepseek/deepseek-reasoner" \
-    "", # 注意此处需带 openai/ 前缀以触发兼容模式
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url=os.getenv("DEEPSEEK_API_BASE"),
-    temperature=0.01,
-    response_format={
-        'type': 'json_object'
-    },
-    max_tokens=4096
-)
-
 skill_path = "src/ai_stock_trade_helper/skills"
 skills = discover_skills(Path(skill_path))
 activated = [activate_skill(s) for s in skills if s.name == "multi-stock-analysis"]
@@ -33,9 +20,18 @@ activated = [activate_skill(s) for s in skills if s.name == "multi-stock-analysi
 @CrewBase
 class MultiStockCrew:
     """多股分析Crew - 通过行业投资分析智能体综合多支股票的决策"""
-
-    agents_config = "config/agents.yaml"
-    tasks_config = "config/tasks.yaml"
+    # 初始化 DeepSeek 模型
+    llm = LLM(
+        model="deepseek/deepseek-reasoner" \
+        "", # 注意此处需带 openai/ 前缀以触发兼容模式
+        api_key=os.getenv("DEEPSEEK_API_KEY"),
+        base_url=os.getenv("DEEPSEEK_API_BASE"),
+        temperature=0.5,
+        response_format={
+            'type': 'json_object'
+        },
+        max_tokens=4096
+    )
 
     @agent
     def multi_stock_analyzer(self) -> Agent:
@@ -48,7 +44,7 @@ class MultiStockCrew:
                 你能够从宏观到微观分析行业趋势，对比不同股票的相对优劣，
                 制定平衡风险与收益的投资策略，实现投资组合的最优配置。""",
             skills=activated,
-            llm=llm,
+            llm=self.llm,
             # verbose=True,
         )
 
@@ -73,8 +69,8 @@ class MultiStockCrew:
                 用户总资产：{user_assets}
 
                 用户当前持仓情况：
-                {user_stock_holds}\n
-                """ + "使用如下skill执行任务：\n" + activated[0].instructions,
+                {user_stock_holds}
+                """,
             expected_output = """
                 提供结构化的多股综合决策结果，输出json格式：
                 {
@@ -110,5 +106,6 @@ class MultiStockCrew:
             tasks=[self.multi_stock_analysis_task()],
             process=Process.sequential,
             skills=activated,
+            tracing=True,
             verbose=True,
         )

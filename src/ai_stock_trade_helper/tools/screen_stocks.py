@@ -26,10 +26,10 @@ def screen_top_stocks_by_industry(
     industry_label: str,
     user_stock_codes: List[str] = [],
     top_n: int = 20,
-    min_market_cap: float = 30,  # 最小流通市值（亿元）
-    min_roe: float = 8,  # 最小净资产收益率 (%)
-    min_net_margin: float = 3,  # 最小销售净利率 (%)
-    max_debt_ratio: float = 70,  # 最大资产负债率 (%)
+    min_market_cap: float = 20,  # 最小流通市值（亿元）
+    min_roe: float = 6,  # 最小净资产收益率 (%)
+    min_net_margin: float = 1,  # 最小销售净利率 (%)
+    max_debt_ratio: float = 80,  # 最大资产负债率 (%)
 ) -> List[StockInfo]:
     """
     按行业 + 通用基本面指标筛选 Top 股票
@@ -37,11 +37,11 @@ def screen_top_stocks_by_industry(
     Args:
         industry_name (str): 行业名称，例如：半导体、银行、医药生物、光伏设备、汽车整车
         top_n (int): 返回前N只股票，默认20
-        min_market_cap (float): 最小流通市值（亿元），默认30
+        min_market_cap (float): 最小流通市值（亿元），默认20
         min_trading_volume (float): 最小成交额（亿元），默认0.5
-        min_roe (float): 最小净资产收益率 (%)，默认8
-        min_net_margin (float): 最小销售净利率 (%)，默认3
-        max_debt_ratio (float): 最大资产负债率 (%)，默认70
+        min_roe (float): 最小净资产收益率 (%)，默认6
+        min_net_margin (float): 最小销售净利率 (%)，默认1
+        max_debt_ratio (float): 最大资产负债率 (%)，默认80
         
     Returns:
         Optional[pd.DataFrame]: 筛选结果DataFrame，包含关键财务指标；若筛选失败则返回None
@@ -91,8 +91,8 @@ def screen_top_stocks_by_industry(
                 # 负债安全
                 (df["资产负债率"] <= max_debt_ratio) &
                 # 增长
-                (df["营业收入同比增长率"] >= 0) &
-                (df["归属净利润同比增长率"] >= 0) 
+                (df["营业收入同比增长率"] >= 0) 
+                # (df["归属净利润同比增长率"] >= 0) 
             ].copy()
 
             if spot_df.empty:
@@ -196,18 +196,21 @@ def get_stock_base_data(code: str) -> pd.DataFrame:
     return fin_data
 
 if __name__ == "__main__":
-    # 示例：筛选半导体行业的优质股票
-    result = screen_top_stocks_by_industry(
-        industry_label="new_fdsb",
-        top_n=20,
-        min_market_cap=30,      # 流通市值 >= 30亿
-        min_roe=8,              # ROE >= 8%
-        min_net_margin=3,       # 销售净利率 >= 3%
-        max_debt_ratio=70       # 资产负债率 <= 70%
-    )
+    # # 示例：筛选半导体行业的优质股票
+    # result = screen_top_stocks_by_industry(
+    #     industry_label="new_fdsb",
+    #     top_n=20,
+    #     min_market_cap=30,      # 流通市值 >= 30亿
+    #     min_roe=8,              # ROE >= 8%
+    #     min_net_margin=3,       # 销售净利率 >= 3%
+    #     max_debt_ratio=70       # 资产负债率 <= 70%
+    # )
     
-    if result is not None and not result.empty:
-        print(f"\n找到 {len(result)} 只符合条件的股票:")
-        print(result.to_string(index=False))
-    else:
-        print("未找到符合条件的股票")
+    # if result is not None and not result.empty:
+    #     print(f"\n找到 {len(result)} 只符合条件的股票:")
+    #     print(result.to_string(index=False))
+    # else:
+    #     print("未找到符合条件的股票")
+
+    stock_name = get_stock_base_data("sh600176")['name'].values[0]
+    print(stock_name)

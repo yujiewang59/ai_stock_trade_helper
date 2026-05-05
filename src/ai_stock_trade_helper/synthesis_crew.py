@@ -15,18 +15,6 @@ from crewai.skills import discover_skills, activate_skill
 
 load_dotenv()
 
-# 初始化 DeepSeek 模型
-llm = LLM(
-    model="deepseek/deepseek-reasoner",
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url=os.getenv("DEEPSEEK_API_BASE"),
-    temperature=0.05,
-    response_format={
-        'type': 'json_object'
-    },
-    max_tokens=4096
-)
-
 skill_path = "src/ai_stock_trade_helper/skills"
 skills = discover_skills(Path(skill_path))
 activated = [activate_skill(s) for s in skills if s.name == "synthesis-analysis"]
@@ -35,9 +23,17 @@ activated = [activate_skill(s) for s in skills if s.name == "synthesis-analysis"
 @CrewBase
 class SynthesisCrew:
     """综合分析Crew - 通过投资决策管理智能体综合三维分析结果"""
-
-    agents_config = "config/agents.yaml"
-    tasks_config = "config/tasks.yaml"
+    # 初始化 DeepSeek 模型
+    llm = LLM(
+        model="deepseek/deepseek-reasoner",
+        api_key=os.getenv("DEEPSEEK_API_KEY"),
+        base_url=os.getenv("DEEPSEEK_API_BASE"),
+        temperature=0.07,
+        response_format={
+            'type': 'json_object'
+        },
+        max_tokens=4096
+    )
 
     @agent
     def investment_decision_manager(self) -> Agent:
@@ -50,8 +46,7 @@ class SynthesisCrew:
                 你是一位资深的投资决策专家，拥有20年的投资管理经验。
                 你擅长统筹各类分析结果，权衡不同维度的信息，做出综合而平衡的投资决策。
                 你的决策考虑周全、风险管理严格，能够为投资者提供最优的投资方案。""",
-            skills=activated,
-            llm=llm,
+            llm=self.llm,
             # verbose=True,
         )
 
@@ -70,8 +65,8 @@ class SynthesisCrew:
                 该股票行业为{industry}，用户风险偏好为{risk_level}
                 
                 三种维度的分析结果：
-                {analysis_results}\n
-                """ + "使用如下skill执行任务：\n" + activated[0].instructions
+                {analysis_results}
+                """
                 ,
             expected_output = """
                 提供结构化的股票综合分析结果，输出json格式：
@@ -95,5 +90,6 @@ class SynthesisCrew:
             tasks=[self.synthesis_task()],
             process=Process.sequential,
             skills=activated,
+            tracing=True,
             verbose=True,
         )

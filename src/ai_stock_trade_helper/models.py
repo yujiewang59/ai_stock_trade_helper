@@ -30,9 +30,9 @@ class AnalysisResult(BaseModel):
     """单个分析结果"""
     stock_code: str = Field(..., description="股票代码")
     stock_name: str = Field(..., description="股票名称")
-    recommendation: str = Field(..., description="操作建议：buy/sell/hold")
+    recommendation: Optional[str] = Field(None, description="操作建议：buy/sell/hold")
     position_size: Optional[float] = Field(None, description="建议仓位大小（0-1）")
-    confidence: float = Field(..., description="操作置信度（0-1）")
+    confidence: Optional[float] = Field(None, description="操作置信度（0-1）")
     reason: Optional[str] = Field(None, description="原因分析报告")
 
 

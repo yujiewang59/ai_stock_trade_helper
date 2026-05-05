@@ -4,12 +4,17 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import json
 import logging
+from dotenv import load_dotenv
+from openinference.instrumentation.crewai import CrewAIInstrumentor
+
+load_dotenv()
 
 from ai_stock_trade_helper.models import MultiStockDecision, StockAnalysisState, AnalysisResult, StockInfo
 from ai_stock_trade_helper.multi_dimension_crew import BaseAnalysisCrew, SentimentAnalysisCrew, TechnicalAnalysisCrew
 from ai_stock_trade_helper.synthesis_crew import SynthesisCrew
 from ai_stock_trade_helper.multi_stock_crew import MultiStockCrew
 from ai_stock_trade_helper.tools.screen_stocks import screen_top_stocks_by_industry
+from ai_stock_trade_helper.tools.stock_tools_func import StockBasicInfoTool, StockTechnicalIndicatorsTool, MarketSentimentTool
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,6 +22,8 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+CrewAIInstrumentor().instrument(skip_dep_check=True)
 
 class StockAnalysisFlow(Flow[StockAnalysisState]):
     """股票分析工作流 - 编排并行执行基本面、技术面、市场情绪分析阶段"""
@@ -47,10 +54,10 @@ class StockAnalysisFlow(Flow[StockAnalysisState]):
                 industry_label=self.state.industry_label,
                 user_stock_codes=user_stocks,
                 top_n=20,
-                min_market_cap=30,      # 流通市值 >= 30亿
-                min_roe=8,              # ROE >= 8%
-                min_net_margin=3,       # 销售净利率 >= 3%
-                max_debt_ratio=70       # 资产负债率 <= 70%
+                min_market_cap=20,      # 流通市值 >= 20亿
+                min_roe=6,              # ROE >= 6%
+                min_net_margin=1,       # 销售净利率 >= 1%
+                max_debt_ratio=80       # 资产负债率 <= 80%
             )
             
             if not stock_codes:
@@ -75,7 +82,7 @@ class StockAnalysisFlow(Flow[StockAnalysisState]):
         
         try:
             # 构建输入数组
-            inputs = [{"stock_code": stock.stock_code, "stock_name": stock.stock_name, "industry": self.state.industry} for stock in stock_codes]
+            inputs = [{"stock_code": stock.stock_code, "stock_name": stock.stock_name, "industry": self.state.industry, "basic_info": StockBasicInfoTool(stock.stock_code)} for stock in stock_codes]
 
             self.state.base_analysis_results = []
             
@@ -102,7 +109,7 @@ class StockAnalysisFlow(Flow[StockAnalysisState]):
         
         try:
             # 构建输入数组
-            inputs = [{"stock_code": stock.stock_code, "stock_name": stock.stock_name, "industry": self.state.industry} for stock in stock_codes]
+            inputs = [{"stock_code": stock.stock_code, "stock_name": stock.stock_name, "industry": self.state.industry, "technical_info": StockTechnicalIndicatorsTool(stock.stock_code)} for stock in stock_codes]
             
             self.state.technical_analysis_results = []
             # 使用 kickoff_for_each 并行执行技术面分析
@@ -127,7 +134,7 @@ class StockAnalysisFlow(Flow[StockAnalysisState]):
         
         try:
             # 构建输入数组
-            inputs = [{"stock_code": stock.stock_code, "stock_name": stock.stock_name, "industry": self.state.industry} for stock in stock_codes]
+            inputs = [{"stock_code": stock.stock_code, "stock_name": stock.stock_name, "industry": self.state.industry, "sentiment_info": MarketSentimentTool(stock.stock_code)} for stock in stock_codes]
             
             self.state.sentiment_analysis_results = []
             # 使用 kickoff_for_each 并行执行市场情绪分析
@@ -163,18 +170,12 @@ class StockAnalysisFlow(Flow[StockAnalysisState]):
                 # 构建分析结果摘要
                 analysis_results = f"""
                 基本面分析结果：
-                - decision: {base_result.recommendation if base_result else '无'}
-                - confidence: {base_result.confidence if base_result else 0}
                 - reason: {base_result.reason if base_result else '无'}
 
                 技术面分析结果：
-                - decision: {technical_result.recommendation if technical_result else '无'}
-                - confidence: {technical_result.confidence if technical_result else 0}
                 - reason: {technical_result.reason if technical_result else '无'}
 
                 市场情绪分析结果：
-                - decision: {sentiment_result.recommendation if sentiment_result else '无'}
-                - confidence: {sentiment_result.confidence if sentiment_result else 0}
                 - reason: {sentiment_result.reason if sentiment_result else '无'}
                 """
                 
@@ -234,8 +235,19 @@ class StockAnalysisFlow(Flow[StockAnalysisState]):
         try:
             result = await MultiStockCrew().crew().akickoff(inputs=inputs)
             logger.info("多股综合分析完成")
-            result = MultiStockDecision(**json.loads(result.raw))
-            return result.model_dump() if result else "多股分析完成，但未能正确解析结果"
+            decision_result = MultiStockDecision(**json.loads(result.raw))
+            stocks_summary = ["多股分析结果：\n"]
+            for reason in self.state.investment_decisions:
+                stocks_summary.append(f"""
+                股票代码: {reason.stock_code}
+                股票名称: {reason.stock_name}
+                {reason.reason}
+                """)
+                stocks_summary.append("-------------------\n")
+
+            decision_result.summary = str("\n".join(stocks_summary)) + "综合总结：" + str(decision_result.summary)
+
+            return decision_result.model_dump() if decision_result else "多股分析完成，但未能正确解析结果"
         
         except Exception as e:
             logger.error(f"多股分析失败: {e}", exc_info=True)
